@@ -77,6 +77,11 @@
             animation: bounce 0.5s infinite;
         }
 
+        .chipmunk.dead {
+            animation: funeral 2s ease-in-out infinite;
+            filter: grayscale(1) brightness(0.5);
+        }
+
         @keyframes eat {
             0%, 100% { transform: scale(1); }
             50% { transform: scale(1.1); }
@@ -85,6 +90,78 @@
         @keyframes bounce {
             0%, 100% { transform: translateY(0); }
             50% { transform: translateY(-20px); }
+        }
+
+        @keyframes funeral {
+            0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0.3; }
+            25% { transform: translateY(-10px) rotate(-5deg); opacity: 0.5; }
+            75% { transform: translateY(-10px) rotate(5deg); opacity: 0.5; }
+        }
+
+        .grave {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 60px;
+            display: none;
+            animation: fadeIn 1s ease-in;
+        }
+
+        .grave.visible {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .game-over-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            z-index: 1000;
+            color: white;
+            text-align: center;
+        }
+
+        .game-over-overlay.visible {
+            display: flex;
+        }
+
+        .game-over-overlay h2 {
+            font-size: 3em;
+            margin-bottom: 20px;
+            color: #fc8181;
+        }
+
+        .game-over-overlay p {
+            font-size: 1.5em;
+            margin-bottom: 30px;
+        }
+
+        .restart-btn {
+            padding: 15px 40px;
+            font-size: 1.2em;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .restart-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
         }
 
         .status-indicators {
@@ -243,6 +320,7 @@
         <div class="chipmunk-display">
             <div class="zzz" id="zzz">💤</div>
             <div class="chipmunk" id="chipmunk">🐿️</div>
+            <div class="grave" id="grave">⚰️</div>
         </div>
 
         <div class="status-indicators">
@@ -320,6 +398,14 @@
                 <div class="stat-label">Поколение</div>
             </div>
         </div>
+
+        <div class="game-over-overlay" id="gameOverOverlay">
+            <h2>💔 Бурундук умер 💔</h2>
+            <p>Вы не смогли позаботиться о своём питомце...</p>
+            <p>Прожил дней: <span id="finalAge">0</span></p>
+            <p>Набрано очков: <span id="finalScore">0</span></p>
+            <button class="restart-btn" onclick="restartGame()">Начать заново</button>
+        </div>
     </div>
 
     <script>
@@ -354,11 +440,17 @@
         // DOM Elements
         const chipmunk = document.getElementById('chipmunk');
         const zzz = document.getElementById('zzz');
+        const grave = document.getElementById('grave');
         const messageEl = document.getElementById('message');
         const btnFeed = document.getElementById('btn-feed');
         const btnWater = document.getElementById('btn-water');
         const btnPlay = document.getElementById('btn-play');
         const btnSleep = document.getElementById('btn-sleep');
+        const gameOverOverlay = document.getElementById('gameOverOverlay');
+        const finalAgeEl = document.getElementById('finalAge');
+        const finalScoreEl = document.getElementById('finalScore');
+
+        let isGameOver = false;
 
         // Update progress bars
         function updateBars() {
@@ -529,6 +621,14 @@
 
         // Check critical conditions
         function checkCriticalConditions() {
+            if (isGameOver) return;
+
+            // Check if all stats are zero - death condition
+            if (gameState.hunger === 0 && gameState.thirst === 0 && gameState.energy === 0 && gameState.fun === 0) {
+                triggerDeath();
+                return;
+            }
+
             if (gameState.hunger === 0 || gameState.thirst === 0) {
                 showMessage("Мне очень плохо... Помоги! 😢");
                 chipmunk.style.filter = 'grayscale(0.8)';
@@ -537,6 +637,69 @@
             } else {
                 chipmunk.style.filter = 'none';
             }
+        }
+
+        // Trigger death and funeral animation
+        function triggerDeath() {
+            isGameOver = true;
+            
+            // Show funeral animation
+            chipmunk.classList.add('dead');
+            chipmunk.textContent = '👻';
+            grave.classList.add('visible');
+            
+            // Hide status indicators and controls
+            document.querySelector('.status-indicators').style.opacity = '0.3';
+            document.querySelector('.controls').style.pointerEvents = 'none';
+            document.querySelector('.controls').style.opacity = '0.3';
+            
+            // Show game over overlay after a delay
+            setTimeout(() => {
+                finalAgeEl.textContent = gameState.age;
+                finalScoreEl.textContent = gameState.score;
+                gameOverOverlay.classList.add('visible');
+            }, 2000);
+            
+            showMessage("Бурундук умер... 💔");
+        }
+
+        // Restart the game
+        function restartGame() {
+            // Reset game state
+            gameState = {
+                hunger: 100,
+                thirst: 100,
+                fun: 100,
+                energy: 100,
+                isSleeping: false,
+                age: 0,
+                score: 0,
+                generation: gameState.generation + 1,
+                lastUpdate: Date.now()
+            };
+            
+            isGameOver = false;
+            
+            // Reset UI
+            chipmunk.classList.remove('dead');
+            chipmunk.textContent = '🐿️';
+            chipmunk.style.filter = 'none';
+            grave.classList.remove('visible');
+            gameOverOverlay.classList.remove('visible');
+            
+            document.querySelector('.status-indicators').style.opacity = '1';
+            document.querySelector('.controls').style.pointerEvents = 'auto';
+            document.querySelector('.controls').style.opacity = '1';
+            
+            btnSleep.innerHTML = '<span>🌙</span><span>Спать</span>';
+            zzz.classList.remove('visible');
+            chipmunk.classList.remove('sleeping');
+            
+            updateBars();
+            showMessage("Новый бурундук готов! 🐿️");
+            document.getElementById('age').textContent = '0';
+            document.getElementById('score').textContent = '0';
+            document.getElementById('generation').textContent = gameState.generation;
         }
 
         // Initialize game
