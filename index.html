@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Location JS Game</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #111;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        canvas {
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            border-radius: 4px;
+        }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            pointer-events: none;
+        }
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            font-size: 14px;
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body>
+
+<div id="ui">
+    <h1 id="location-name">Локация 1: Стандарт</h1>
+    <p>FPS: <span id="fps-counter">0</span></p>
+</div>
+<div class="controls">
+    WASD / Стрелки - Движение<br>
+    SPACE - Прыжок<br>
+    E - Сменить локацию
+</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+/**
+ * ОПТИМИЗАЦИЯ:
+ * 1. Использование requestAnimationFrame вместо setInterval.
+ * 2. Ограничение максимальной дельты времени (чтобы игра не ускорялась при лагах).
+ * 3. Минимальное создание объектов внутри игрового цикла (Garbage Collection friendly).
+ * 4. Отрисовка только видимых элементов.
+ */
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d', { alpha: false }); // Отключаем альфа-канал фона для скорости
+const fpsDisplay = document.getElementById('fps-counter');
+const locationNameDisplay = document.getElementById('location-name');
+
+// Настройки под ноутбук (адаптивный размер, но фиксированное внутреннее разрешение для производительности)
+const GAME_WIDTH = 800;
+const GAME_HEIGHT = 600;
+
+function resize() {
+    let scale = Math.min(window.innerWidth / GAME_WIDTH, window.innerHeight / GAME_HEIGHT);
+    canvas.width = GAME_WIDTH;
+    canvas.height = GAME_HEIGHT;
+    canvas.style.width = `${GAME_WIDTH * scale}px`;
+    canvas.style.height = `${GAME_HEIGHT * scale}px`;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// --- КОНФИГУРАЦИЯ ИГРЫ ---
+
+const LOCATIONS = [
+    {
+        id: 0,
+        name: "Зеленая Зона (Стандарт)",
+        bg: "#2e7d32",
+        gravity: 0.6,
+        friction: 0.8,
+        jumpForce: -12,
+        speed: 5,
+        platformColor: "#1b5e20"
+    },
+    {
+        id: 1,
+        name: "Красная Зона (Низкая гравитация + Лед)",
+        bg: "#c62828",
+        gravity: 0.3, // Низкая гравитация
+        friction: 0.98, // Скользко (лед)
+        jumpForce: -10,
+        speed: 6,
+        platformColor: "#8e0000"
+    },
+    {
+        id: 2,
+        name: "Синяя Зона (Высокий прыжок + Быстро)",
+        bg: "#1565c0",
+        gravity: 0.8,
+        friction: 0.85,
+        jumpForce: -18, // Супер прыжок
+        speed: 8, // Очень быстро
+        platformColor: "#0d47a1"
+    }
+];
+
+let currentLocationIndex = 0;
+let currentLocation = LOCATIONS[0];
+
+// --- ИГРОВЫЕ ОБЪЕКТЫ ---
+
+const player = {
+    x: 100,
+    y: 300,
+    width: 30,
+    height: 30,
+    vx: 0,
+    vy: 0,
+    grounded: false,
+    color: "#ffeb3b"
+};
+
+const platforms = [];
+
+// Генерация платформ для текущей локации
+function generateLevel() {
+    platforms.length = 0; // Очистка массива (оптимизация: переиспользование массива)
+    
+    // Пол
+    platforms.push({ x: 0, y: 550, w: 800, h: 50 });
+    
+    // Стены
+    platforms.push({ x: -10, y: 0, w: 10, h: 600 });
+    platforms.push({ x: 800, y: 0, w: 10, h: 600 });
+
+    // Платформы
+    if (currentLocationIndex === 0) {
+        // Стандартные ступеньки
+        platforms.push({ x: 200, y: 450, w: 100, h: 20 });
+        platforms.push({ x: 400, y: 350, w: 100, h: 20 });
+        platforms.push({ x: 600, y: 250, w: 100, h: 20 });
+    } else if (currentLocationIndex === 1) {
+        // Длинные платформы для скольжения
+        platforms.push({ x: 150, y: 400, w: 500, h: 20 });
+        platforms.push({ x: 50, y: 200, w: 200, h: 20 });
+    } else if (currentLocationIndex === 2) {
+        // Высокие и узкие платформы для высоких прыжков
+        platforms.push({ x: 350, y: 450, w: 100, h: 20 });
+        platforms.push({ x: 350, y: 300, w: 100, h: 20 });
+        platforms.push({ x: 350, y: 150, w: 100, h: 20 });
+    }
+}
+
+// --- УПРАВЛЕНИЕ ---
+
+const keys = {};
+
+window.addEventListener('keydown', (e) => {
+    keys[e.code] = true;
+    
+    if (e.code === 'KeyE') {
+        switchLocation();
+    }
+});
+
+window.addEventListener('keyup', (e) => {
+    keys[e.code] = false;
+});
+
+function switchLocation() {
+    currentLocationIndex = (currentLocationIndex + 1) % LOCATIONS.length;
+    currentLocation = LOCATIONS[currentLocationIndex];
+    
+    // Сброс игрока
+    player.x = 50;
+    player.y = 300;
+    player.vx = 0;
+    player.vy = 0;
+    
+    generateLevel();
+    updateUI();
+}
+
+function updateUI() {
+    locationNameDisplay.innerText = currentLocation.name;
+    locationNameDisplay.style.color = currentLocation.bg;
+}
+
+// --- ФИЗИКА И ЛОГИКА ---
+
+function update() {
+    // Движение влево/вправо
+    if (keys['ArrowRight'] || keys['KeyD']) {
+        if (player.vx < currentLocation.speed) player.vx++;
+    }
+    if (keys['ArrowLeft'] || keys['KeyA']) {
+        if (player.vx > -currentLocation.speed) player.vx--;
+    }
+
+    // Трение (зависит от локации)
+    player.vx *= currentLocation.friction;
+
+    // Гравитация (зависит от локации)
+    player.vy += currentLocation.gravity;
+
+    // Прыжок
+    if ((keys['Space'] || keys['ArrowUp']) && player.grounded) {
+        player.vy = currentLocation.jumpForce;
+        player.grounded = false;
+    }
+
+    // Применение скоростей
+    player.x += player.vx;
+    player.y += player.vy;
+
+    // Коллизии
+    player.grounded = false;
+    
+    for (let plat of platforms) {
+        // Простая AABB коллизия
+        if (player.x < plat.x + plat.w &&
+            player.x + player.width > plat.x &&
+            player.y < plat.y + plat.h &&
+            player.y + player.height > plat.y) {
+            
+            // Столкновение сверху (приземление)
+            // Проверяем, что раньше кадр был выше платформы
+            const prevY = player.y - player.vy;
+            if (prevY + player.height <= plat.y + (player.vy * 1.5)) { // Небольшой допуск
+                player.grounded = true;
+                player.vy = 0;
+                player.y = plat.y - player.height;
+            } 
+            // Столкновение снизу (удар головой)
+            else if (prevY >= plat.y + plat.h) {
+                player.vy = 0;
+                player.y = plat.y + plat.h;
+            }
+            // Боковые столкновения
+            else {
+                if (player.vx > 0) {
+                    player.x = plat.x - player.width;
+                    player.vx = 0;
+                } else if (player.vx < 0) {
+                    player.x = plat.x + plat.w;
+                    player.vx = 0;
+                }
+            }
+        }
+    }
+
+    // Границы мира (на всякий случай)
+    if (player.y > GAME_HEIGHT) {
+        player.y = 0; // Телепорт наверх если упал
+        player.vy = 0;
+    }
+}
+
+// --- ОТРИСОВКА ---
+
+function draw() {
+    // Очистка экрана цветом фона локации
+    ctx.fillStyle = currentLocation.bg;
+    ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+    // Отрисовка платформ
+    ctx.fillStyle = currentLocation.platformColor;
+    for (let plat of platforms) {
+        ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
+        
+        // Декор платформ (рамка)
+        ctx.strokeStyle = "rgba(0,0,0,0.3)";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(plat.x, plat.y, plat.w, plat.h);
+    }
+
+    // Отрисовка игрока
+    ctx.fillStyle = player.color;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = "rgba(0,0,0,0.5)";
+    ctx.fillRect(player.x, player.y, player.width, player.height);
+    ctx.shadowBlur = 0; // Сброс тени для производительности
+    
+    // Глаза игрока (для направления)
+    ctx.fillStyle = "black";
+    let eyeOffset = player.vx >= 0 ? 18 : 4;
+    ctx.fillRect(player.x + eyeOffset, player.y + 8, 4, 4);
+}
+
+// --- ИГРОВОЙ ЦИКЛ ---
+
+let lastTime = 0;
+let frameCount = 0;
+let lastFpsTime = 0;
+
+function gameLoop(timestamp) {
+    // Расчет deltaTime (время между кадрами)
+    const deltaTime = timestamp - lastTime;
+    lastTime = timestamp;
+
+    // Обновление логики
+    update();
+    
+    // Отрисовка
+    draw();
+
+    // Подсчет FPS (для мониторинга производительности на ноутбуке)
+    frameCount++;
+    if (timestamp - lastFpsTime >= 1000) {
+        fpsDisplay.innerText = frameCount;
+        frameCount = 0;
+        lastFpsTime = timestamp;
+    }
+
+    requestAnimationFrame(gameLoop);
+}
+
+// Запуск
+generateLevel();
+updateUI();
+requestAnimationFrame(gameLoop);
+
+</script>
+</body>
+</html>
