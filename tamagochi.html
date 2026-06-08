@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Бурундук Тамагочи</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .game-container {
+            background: linear-gradient(180deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 30px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 500px;
+            width: 100%;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            color: #2d3748;
+            font-size: 2em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .chipmunk-display {
+            background: linear-gradient(180deg, #a8edea 0%, #fed6e3 100%);
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .chipmunk {
+            font-size: 120px;
+            display: inline-block;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .chipmunk.sleeping {
+            filter: brightness(0.8);
+            transform: rotate(90deg);
+        }
+
+        .chipmunk.eating {
+            animation: eat 0.5s infinite;
+        }
+
+        .chipmunk.playing {
+            animation: bounce 0.5s infinite;
+        }
+
+        @keyframes eat {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+
+        .status-indicators {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .status-item {
+            background: white;
+            padding: 15px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .status-label {
+            font-size: 0.9em;
+            color: #4a5568;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .progress-bar {
+            background: #e2e8f0;
+            border-radius: 10px;
+            height: 20px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.5s ease, background-color 0.3s ease;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        .control-btn {
+            padding: 20px;
+            border: none;
+            border-radius: 15px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            color: white;
+        }
+
+        .control-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .control-btn:active {
+            transform: translateY(0);
+        }
+
+        .control-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-feed {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        .btn-water {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+
+        .btn-play {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+        }
+
+        .btn-sleep {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .message-area {
+            background: white;
+            padding: 15px;
+            border-radius: 15px;
+            margin-top: 20px;
+            text-align: center;
+            color: #4a5568;
+            font-style: italic;
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .zzz {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            font-size: 30px;
+            color: #667eea;
+            animation: float 2s infinite;
+            display: none;
+        }
+
+        .zzz.visible {
+            display: block;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); opacity: 1; }
+            50% { transform: translateY(-10px); opacity: 0.5; }
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid #e2e8f0;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #2d3748;
+        }
+
+        .stat-label {
+            font-size: 0.8em;
+            color: #718096;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="header">
+            <h1>🐿️ Бурундук Тамагочи</h1>
+        </div>
+
+        <div class="chipmunk-display">
+            <div class="zzz" id="zzz">💤</div>
+            <div class="chipmunk" id="chipmunk">🐿️</div>
+        </div>
+
+        <div class="status-indicators">
+            <div class="status-item">
+                <div class="status-label">
+                    <span>🍎</span> Сытость
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="hunger-bar" style="width: 100%; background: linear-gradient(90deg, #f093fb 0%, #f5576c 100%);"></div>
+                </div>
+            </div>
+
+            <div class="status-item">
+                <div class="status-label">
+                    <span>💧</span> Жажда
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="thirst-bar" style="width: 100%; background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);"></div>
+                </div>
+            </div>
+
+            <div class="status-item">
+                <div class="status-label">
+                    <span>🎮</span> Настроение
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="fun-bar" style="width: 100%; background: linear-gradient(90deg, #43e97b 0%, #38f9d7 100%);"></div>
+                </div>
+            </div>
+
+            <div class="status-item">
+                <div class="status-label">
+                    <span>😴</span> Энергия
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="energy-bar" style="width: 100%; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="control-btn btn-feed" id="btn-feed" onclick="feed()">
+                <span>🍎</span>
+                <span>Кормить</span>
+            </button>
+            <button class="control-btn btn-water" id="btn-water" onclick="water()">
+                <span>💧</span>
+                <span>Поить</span>
+            </button>
+            <button class="control-btn btn-play" id="btn-play" onclick="play()">
+                <span>🎾</span>
+                <span>Играть</span>
+            </button>
+            <button class="control-btn btn-sleep" id="btn-sleep" onclick="toggleSleep()">
+                <span>🌙</span>
+                <span>Спать</span>
+            </button>
+        </div>
+
+        <div class="message-area" id="message">
+            Привет! Я твой бурундук! Позаботься обо мне! 🐿️
+        </div>
+
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-value" id="age">0</div>
+                <div class="stat-label">Дней</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="score">0</div>
+                <div class="stat-label">Очков</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="generation">1</div>
+                <div class="stat-label">Поколение</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Game state
+        let gameState = {
+            hunger: 100,
+            thirst: 100,
+            fun: 100,
+            energy: 100,
+            isSleeping: false,
+            age: 0,
+            score: 0,
+            generation: 1,
+            lastUpdate: Date.now()
+        };
+
+        // Constants
+        const DECAY_RATES = {
+            hunger: 0.5,
+            thirst: 0.7,
+            fun: 0.4,
+            energy: 0.3
+        };
+
+        const BOOST_VALUES = {
+            hunger: 30,
+            thirst: 35,
+            fun: 25,
+            energy: 40
+        };
+
+        // DOM Elements
+        const chipmunk = document.getElementById('chipmunk');
+        const zzz = document.getElementById('zzz');
+        const messageEl = document.getElementById('message');
+        const btnFeed = document.getElementById('btn-feed');
+        const btnWater = document.getElementById('btn-water');
+        const btnPlay = document.getElementById('btn-play');
+        const btnSleep = document.getElementById('btn-sleep');
+
+        // Update progress bars
+        function updateBars() {
+            const bars = {
+                'hunger-bar': gameState.hunger,
+                'thirst-bar': gameState.thirst,
+                'fun-bar': gameState.fun,
+                'energy-bar': gameState.energy
+            };
+
+            for (const [id, value] of Object.entries(bars)) {
+                const bar = document.getElementById(id);
+                bar.style.width = `${Math.max(0, value)}%`;
+                
+                // Change color based on value
+                if (value < 30) {
+                    bar.style.background = '#fc8181';
+                } else if (value < 60) {
+                    bar.style.background = '#fbbf24';
+                }
+            }
+        }
+
+        // Show message
+        function showMessage(text) {
+            messageEl.textContent = text;
+            setTimeout(() => {
+                if (!gameState.isSleeping) {
+                    messageEl.textContent = getRandomMessage();
+                }
+            }, 3000);
+        }
+
+        // Get random message
+        function getRandomMessage() {
+            const messages = [
+                "Я люблю тебя! 🐿️",
+                "Давай ещё поиграем! 🎾",
+                "Ммм, вкусно! 😋",
+                "Я счастливый бурундук! 💕",
+                "Почешите меня за ушком! 🥰"
+            ];
+            return messages[Math.floor(Math.random() * messages.length)];
+        }
+
+        // Feed the chipmunk
+        function feed() {
+            if (gameState.isSleeping) {
+                showMessage("Я сплю! Разбуди меня сначала! 😴");
+                return;
+            }
+            
+            if (gameState.hunger >= 100) {
+                showMessage("Я не голоден! 😊");
+                return;
+            }
+
+            gameState.hunger = Math.min(100, gameState.hunger + BOOST_VALUES.hunger);
+            gameState.energy = Math.min(100, gameState.energy + 5);
+            gameState.score += 10;
+            
+            chipmunk.classList.add('eating');
+            setTimeout(() => chipmunk.classList.remove('eating'), 1000);
+            
+            showMessage("Вкусно! Спасибо! 🍎");
+            updateBars();
+        }
+
+        // Water the chipmunk
+        function water() {
+            if (gameState.isSleeping) {
+                showMessage("Я сплю! Разбуди меня сначала! 😴");
+                return;
+            }
+            
+            if (gameState.thirst >= 100) {
+                showMessage("Я не хочу пить! 💧");
+                return;
+            }
+
+            gameState.thirst = Math.min(100, gameState.thirst + BOOST_VALUES.thirst);
+            gameState.score += 5;
+            
+            showMessage("Ах, как освежает! 💧");
+            updateBars();
+        }
+
+        // Play with the chipmunk
+        function play() {
+            if (gameState.isSleeping) {
+                showMessage("Я сплю! Разбуди меня сначала! 😴");
+                return;
+            }
+            
+            if (gameState.energy < 20) {
+                showMessage("Я слишком устал для игр... 😴");
+                return;
+            }
+
+            if (gameState.fun >= 100) {
+                showMessage("Мне и так весело! 😄");
+                return;
+            }
+
+            gameState.fun = Math.min(100, gameState.fun + BOOST_VALUES.fun);
+            gameState.energy = Math.max(0, gameState.energy - 15);
+            gameState.hunger = Math.max(0, gameState.hunger - 10);
+            gameState.thirst = Math.max(0, gameState.thirst - 10);
+            gameState.score += 15;
+            
+            chipmunk.classList.add('playing');
+            setTimeout(() => chipmunk.classList.remove('playing'), 1000);
+            
+            showMessage("Ура! Как весело! 🎾");
+            updateBars();
+        }
+
+        // Toggle sleep
+        function toggleSleep() {
+            gameState.isSleeping = !gameState.isSleeping;
+            
+            if (gameState.isSleeping) {
+                chipmunk.classList.add('sleeping');
+                zzz.classList.add('visible');
+                btnSleep.innerHTML = '<span>☀️</span><span>Разбудить</span>';
+                showMessage("Спокойной ночи! 💤");
+            } else {
+                chipmunk.classList.remove('sleeping');
+                zzz.classList.remove('visible');
+                btnSleep.innerHTML = '<span>🌙</span><span>Спать</span>';
+                showMessage("Доброе утро! ☀️");
+            }
+            
+            updateBars();
+        }
+
+        // Game loop - decay stats over time
+        function gameLoop() {
+            const now = Date.now();
+            const delta = (now - gameState.lastUpdate) / 1000; // seconds
+            
+            if (!gameState.isSleeping) {
+                gameState.hunger = Math.max(0, gameState.hunger - DECAY_RATES.hunger * delta);
+                gameState.thirst = Math.max(0, gameState.thirst - DECAY_RATES.thirst * delta);
+                gameState.fun = Math.max(0, gameState.fun - DECAY_RATES.fun * delta);
+                gameState.energy = Math.max(0, gameState.energy - DECAY_RATES.energy * delta);
+            } else {
+                // While sleeping, energy recovers but other stats decay slower
+                gameState.energy = Math.min(100, gameState.energy + DECAY_RATES.energy * delta * 2);
+                gameState.hunger = Math.max(0, gameState.hunger - DECAY_RATES.hunger * delta * 0.5);
+                gameState.thirst = Math.max(0, gameState.thirst - DECAY_RATES.thirst * delta * 0.5);
+            }
+
+            // Age increases every minute
+            if (now - gameState.lastUpdate >= 60000) {
+                gameState.age += 1;
+                document.getElementById('age').textContent = gameState.age;
+            }
+
+            // Check for critical conditions
+            checkCriticalConditions();
+            
+            gameState.lastUpdate = now;
+            updateBars();
+            
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Check critical conditions
+        function checkCriticalConditions() {
+            if (gameState.hunger === 0 || gameState.thirst === 0) {
+                showMessage("Мне очень плохо... Помоги! 😢");
+                chipmunk.style.filter = 'grayscale(0.8)';
+            } else if (gameState.energy === 0 && !gameState.isSleeping) {
+                showMessage("Я очень устал... Нужно поспать... 😴");
+            } else {
+                chipmunk.style.filter = 'none';
+            }
+        }
+
+        // Initialize game
+        function init() {
+            updateBars();
+            showMessage("Привет! Я твой бурундук! Позаботься обо мне! 🐿️");
+            gameLoop();
+        }
+
+        // Start the game
+        init();
+    </script>
+</body>
+</html>
