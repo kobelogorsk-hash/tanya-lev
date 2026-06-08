@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Dodge - Modern Web Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .game-container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .game-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: white;
+            font-size: 2.5rem;
+            font-weight: 300;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            margin-bottom: 10px;
+        }
+
+        .score-display {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 1.2rem;
+            font-weight: 400;
+        }
+
+        #gameCanvas {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        #gameCanvas:hover {
+            border-color: rgba(255, 255, 255, 0.4);
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+        }
+
+        .controls {
+            margin-top: 20px;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.9rem;
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            padding: 12px 30px;
+            font-size: 1rem;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 15px;
+            font-weight: 500;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            display: none;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .game-over h2 {
+            font-size: 2rem;
+            margin-bottom: 15px;
+            font-weight: 300;
+        }
+
+        .game-over p {
+            font-size: 1.2rem;
+            margin-bottom: 25px;
+            opacity: 0.9;
+        }
+
+        .instructions {
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.85rem;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="game-header">
+            <h1>Neon Dodge</h1>
+            <div class="score-display">Счет: <span id="score">0</span></div>
+        </div>
+        
+        <canvas id="gameCanvas" width="600" height="400"></canvas>
+        
+        <div class="controls">
+            <div class="instructions">
+                🎮 Управление: Стрелки ← → или A/D<br>
+                🎯 Цель: Уклоняйся от красных блоков!<br>
+                ⚡ Скорость увеличивается со временем
+            </div>
+            <button class="btn" id="startBtn">Начать игру</button>
+        </div>
+    </div>
+
+    <div class="game-over" id="gameOver">
+        <h2>Игра окончена!</h2>
+        <p>Ваш счет: <span id="finalScore">0</span></p>
+        <button class="btn" id="restartBtn">Играть снова</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const finalScoreElement = document.getElementById('finalScore');
+        const gameOverScreen = document.getElementById('gameOver');
+        const startBtn = document.getElementById('startBtn');
+        const restartBtn = document.getElementById('restartBtn');
+
+        // Game state
+        let gameRunning = false;
+        let score = 0;
+        let animationId;
+        let obstacles = [];
+        let particles = [];
+        let difficulty = 1;
+
+        // Player
+        const player = {
+            x: canvas.width / 2 - 15,
+            y: canvas.height - 50,
+            width: 30,
+            height: 30,
+            speed: 7,
+            dx: 0,
+            color: '#00ff88'
+        };
+
+        // Controls
+        let leftPressed = false;
+        let rightPressed = false;
+
+        document.addEventListener('keydown', keyDownHandler);
+        document.addEventListener('keyup', keyUpHandler);
+
+        function keyDownHandler(e) {
+            if (e.key === 'Right' || e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+                rightPressed = true;
+            } else if (e.key === 'Left' || e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+                leftPressed = true;
+            }
+        }
+
+        function keyUpHandler(e) {
+            if (e.key === 'Right' || e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+                rightPressed = false;
+            } else if (e.key === 'Left' || e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+                leftPressed = false;
+            }
+        }
+
+        // Touch controls for mobile
+        let touchStartX = 0;
+        canvas.addEventListener('touchstart', handleTouchStart);
+        canvas.addEventListener('touchmove', handleTouchMove);
+        canvas.addEventListener('touchend', handleTouchEnd);
+
+        function handleTouchStart(e) {
+            touchStartX = e.touches[0].clientX;
+        }
+
+        function handleTouchMove(e) {
+            if (!gameRunning) return;
+            const touchX = e.touches[0].clientX;
+            const diff = touchX - touchStartX;
+            
+            if (diff > 10) {
+                rightPressed = true;
+                leftPressed = false;
+            } else if (diff < -10) {
+                leftPressed = true;
+                rightPressed = false;
+            } else {
+                leftPressed = false;
+                rightPressed = false;
+            }
+        }
+
+        function handleTouchEnd() {
+            leftPressed = false;
+            rightPressed = false;
+        }
+
+        // Create obstacle
+        function createObstacle() {
+            const width = Math.random() * 60 + 40;
+            const x = Math.random() * (canvas.width - width);
+            obstacles.push({
+                x: x,
+                y: -30,
+                width: width,
+                height: 20,
+                speed: 3 + difficulty * 0.5,
+                color: `hsl(${Math.random() * 60 + 340}, 100%, 60%)`
+            });
+        }
+
+        // Create particle effect
+        function createParticles(x, y, color) {
+            for (let i = 0; i < 15; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    size: Math.random() * 4 + 2,
+                    speedX: (Math.random() - 0.5) * 8,
+                    speedY: (Math.random() - 0.5) * 8,
+                    color: color,
+                    life: 1
+                });
+            }
+        }
+
+        // Update particles
+        function updateParticles() {
+            particles.forEach((particle, index) => {
+                particle.x += particle.speedX;
+                particle.y += particle.speedY;
+                particle.life -= 0.02;
+                particle.size *= 0.98;
+
+                if (particle.life <= 0) {
+                    particles.splice(index, 1);
+                }
+            });
+        }
+
+        // Draw particles
+        function drawParticles() {
+            particles.forEach(particle => {
+                ctx.globalAlpha = particle.life;
+                ctx.fillStyle = particle.color;
+                ctx.beginPath();
+                ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+        }
+
+        // Update player
+        function updatePlayer() {
+            if (rightPressed && player.x < canvas.width - player.width) {
+                player.x += player.speed;
+            }
+            if (leftPressed && player.x > 0) {
+                player.x -= player.speed;
+            }
+        }
+
+        // Update obstacles
+        function updateObstacles() {
+            obstacles.forEach((obstacle, index) => {
+                obstacle.y += obstacle.speed;
+
+                // Remove off-screen obstacles
+                if (obstacle.y > canvas.height) {
+                    obstacles.splice(index, 1);
+                    score += 10;
+                    scoreElement.textContent = score;
+                    
+                    // Increase difficulty
+                    if (score % 100 === 0) {
+                        difficulty += 0.5;
+                    }
+                }
+
+                // Collision detection
+                if (
+                    player.x < obstacle.x + obstacle.width &&
+                    player.x + player.width > obstacle.x &&
+                    player.y < obstacle.y + obstacle.height &&
+                    player.y + player.height > obstacle.y
+                ) {
+                    gameOver();
+                }
+            });
+        }
+
+        // Draw player with glow effect
+        function drawPlayer() {
+            // Glow effect
+            const gradient = ctx.createRadialGradient(
+                player.x + player.width/2, 
+                player.y + player.height/2, 
+                0,
+                player.x + player.width/2, 
+                player.y + player.height/2, 
+                player.width
+            );
+            gradient.addColorStop(0, player.color);
+            gradient.addColorStop(1, 'transparent');
+            
+            ctx.fillStyle = gradient;
+            ctx.fillRect(player.x - 10, player.y - 10, player.width + 20, player.height + 20);
+            
+            // Main player
+            ctx.fillStyle = player.color;
+            ctx.shadowColor = player.color;
+            ctx.shadowBlur = 20;
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+            ctx.shadowBlur = 0;
+        }
+
+        // Draw obstacles
+        function drawObstacles() {
+            obstacles.forEach(obstacle => {
+                ctx.fillStyle = obstacle.color;
+                ctx.shadowColor = obstacle.color;
+                ctx.shadowBlur = 15;
+                ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+                ctx.shadowBlur = 0;
+            });
+        }
+
+        // Draw background grid
+        function drawBackground() {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.lineWidth = 1;
+            
+            // Vertical lines
+            for (let x = 0; x <= canvas.width; x += 50) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            
+            // Horizontal lines
+            for (let y = 0; y <= canvas.height; y += 50) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+        }
+
+        // Game loop
+        function gameLoop() {
+            if (!gameRunning) return;
+
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw background
+            drawBackground();
+
+            // Update and draw game objects
+            updatePlayer();
+            updateObstacles();
+            updateParticles();
+
+            drawObstacles();
+            drawPlayer();
+            drawParticles();
+
+            // Spawn new obstacles
+            if (Math.random() < 0.02 + difficulty * 0.005) {
+                createObstacle();
+            }
+
+            animationId = requestAnimationFrame(gameLoop);
+        }
+
+        // Start game
+        function startGame() {
+            gameRunning = true;
+            score = 0;
+            difficulty = 1;
+            obstacles = [];
+            particles = [];
+            player.x = canvas.width / 2 - 15;
+            scoreElement.textContent = score;
+            gameOverScreen.style.display = 'none';
+            startBtn.style.display = 'none';
+            
+            gameLoop();
+        }
+
+        // Game over
+        function gameOver() {
+            gameRunning = false;
+            cancelAnimationFrame(animationId);
+            createParticles(player.x + player.width/2, player.y + player.height/2, player.color);
+            finalScoreElement.textContent = score;
+            gameOverScreen.style.display = 'block';
+        }
+
+        // Event listeners
+        startBtn.addEventListener('click', startGame);
+        restartBtn.addEventListener('click', startGame);
+
+        // Initial draw
+        drawBackground();
+        drawPlayer();
+    </script>
+</body>
+</html>
